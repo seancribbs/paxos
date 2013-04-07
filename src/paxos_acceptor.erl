@@ -83,23 +83,6 @@ init([]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({p1a, B}, _From, #state{ballot_num = BallotNum,
-                                    accepted = Accepted}=State) ->
-    NewState = case B > BallotNum of
-                   true -> State#{ballot_num=B};
-                   false -> State
-               end,
-    {reply, {p1b, B, ets:tab2list(Accepted)}, NewState};
-handle_call({p2a, {B,_,_}=Ballot}, _From, #state{ballot_num=BallotNum,
-                                                 accepted = Accepted}=State) ->
-    NewState = case B >= BallotNum of
-                   true ->
-                       ets:insert(Accepted, Ballot),
-                       State#state{ballot_num=B};
-                   false ->
-                       State
-               end,
-    {reply, {p2b, BallotNum}, NewState};
 handle_call(_Msg, _From, State) ->
     {stop, unknown_call, State}.
 
@@ -114,6 +97,25 @@ handle_call(_Msg, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({p1a, Leader, B}, #state{ballot_num = BallotNum,
+                                    accepted = Accepted}=State) ->
+    NewState = case B > BallotNum of
+                   true -> State#{ballot_num=B};
+                   false -> State
+               end,
+    paxos_leader:p1b(Leader, B, ets:tab2list(Accepted)),
+    {noreply, NewState};
+handle_cast({p2a, Leader, {B,_,_}=Ballot}, #state{ballot_num=BallotNum,
+                                                  accepted=Accepted}=State) ->
+    NewState = case B >= BallotNum of
+                   true ->
+                       ets:insert(Accepted, Ballot),
+                       State#state{ballot_num=B};
+                   false ->
+                       State
+               end,
+    paxos_leader:p2b(Leader, NewState#state.ballot_num),
+    {reply, {p2b, BallotNum}, NewState};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
