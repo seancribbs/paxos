@@ -1,4 +1,38 @@
-%% @doc The basic replica code from Paxos Made Moderately Complex
+%% -------------------------------------------------------------------
+%%
+%% paxos: A multi-paxos implementation for Erlang
+%%
+%% Copyright (c) 2013 Basho Technologies, Inc.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
+%% @doc The Replica process and behaviour. To implement a Replica,
+%% create a module that implements the perform(Operation, State)
+%% function and start the replica like so:
+%%
+%%     paxos_replica:start_link(Module, InitialState, LeaderPids)
+%%
+%% where Module is the module implementing this behaviour,
+%% InitialState is the state upon which the callback will operate,
+%% and LeaderPids is a list of pids which are the leaders.
+%%
+%% When the Replica commits an operation, it will call
+%% Module:perform/2 to retrieve the modified state and result of the
+%% operation.
+%% @end
 -module(paxos_replica).
 
 -behaviour(gen_server).
@@ -52,16 +86,13 @@ request(Pid, Operation) ->
 %%%===================================================================
 
 init([Mod, InitState, Leaders]) ->
-    Proposals = ets:new(proposals, [ordered_set]),
-    Decisions = ets:new(decisions, [ordered_set]),
     {ok,
-     #state{
-        mod = Mod,
-        mod_state = InitState,
-        leaders = Leaders,
-        proposals = Proposals,
-        decisions = Decisions
-       }}.
+     #state{mod = Mod,
+            mod_state = InitState,
+            leaders = Leaders,
+            proposals = ets:new(proposals, [ordered_set]),
+            decisions = ets:new(decisions, [ordered_set])}
+    }.
 
 handle_call({request, Op}, From, State) ->
     NewState = propose({Op, From}, State),
@@ -112,8 +143,8 @@ decide(S, PVal, #state{slot_num=Slot, decisions=Decisions} = State) ->
 process_decisions([], #state{}=State) ->
     %% We have processed all decisions already, return the new state.
     State;
-process_decisions([{S, PVal}=D], #state{proposals=Proposals, 
-                                        decisions=Decisions}=State) ->
+process_decisions([{S, PVal}], #state{proposals=Proposals,
+                                      decisions=Decisions}=State) ->
     case ets:lookup(Proposals, S) of
         [ {S, PVal1} ] when PVal1 =/= PVal ->
             %% The slot number is the same, but proposal different, so
@@ -131,7 +162,8 @@ perform({Op, From}=PVal, #state{mod=Mod, mod_state=ModState,
     case ets:match(Decisions, {{'$1', PVal}, [{'<', '$1', Slot}], [true]}) of
         [true] ->
             %% There is a decision that has the same signature but a
-            %% lower slot number.
+            %% lower slot number, so we don't execute, just get the
+            %% next decision.
             State#state{slot_num = Slot + 1};
         _ ->
             {Result, NewModState} = Mod:perform(Op, ModState),
