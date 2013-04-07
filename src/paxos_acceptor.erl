@@ -26,7 +26,9 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0,
+         p1a/2,
+         p2a/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -48,6 +50,12 @@
 %%--------------------------------------------------------------------
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
+
+p1a(Pid, Ballot) ->
+    gen_server:cast(Pid, {p1a, self(), Ballot}).
+
+p2a(Pid, Ballot, Slot, PVal) ->
+    gen_server:cast(Pid, {p2a, self(), {Ballot, Slot, PVal}}).
 
 %%%===================================================================
 %%% gen_server callbacks
