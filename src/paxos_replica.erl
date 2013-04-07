@@ -77,9 +77,13 @@ behaviour_info(_) ->
 start_link(CallbackMod, InitState, Leaders) ->
     gen_server:start_link(?MODULE, [CallbackMod, InitState, Leaders], []).
 
--spec request(pid(), any()) -> ok.
+-spec request(pid(), any()) -> any().
 request(Pid, Operation) ->
     gen_server:call(Pid, {request, Operation}, infinity).
+
+-spec decision(pid(), pos_integer(), any()) -> ok.
+decision(Pid, Slot, PVal) ->
+    gen_server:cast(Pid, {decision, {Slot, PVal}}).
 
 %%%===================================================================
 %%% gen_server callbacks
