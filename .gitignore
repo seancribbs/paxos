@@ -1,0 +1,10 @@
+# Erlang
+.eunit/*
+deps/*
+*.o
+ebin/*.beam
+ebin/*.app
+doc/*
+.qc
+.eqc-info
+current_counterexample.eqc

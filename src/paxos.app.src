@@ -1,0 +1,11 @@
+{application, paxos,
+ [
+  {description, "Paxos implementation skeleton"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
