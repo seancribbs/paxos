@@ -39,7 +39,8 @@
 
 %% API
 -export([start_link/3,
-         request/2]).
+         request/2,
+         decision/3]).
 
 %% gen_server callbacks
 -export([init/1,

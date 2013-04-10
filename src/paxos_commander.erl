@@ -38,16 +38,15 @@
 %% States
 -export([start_phase2/2,
          start_phase2/3,
-         collect/2,
-         collect/3]).
+         waiting_p2b/2,
+         waiting_p2b/3]).
 
 -record(state, {
           leader :: pid(),
           acceptors :: [pid()],
           replicas :: [pid()],
           pvalue :: tuple(),
-          threshold :: non_neg_integer(),
-          replies = 0 :: non_neg_integer()
+          waitfor :: set()
          }).
 
 %%%===================================================================
@@ -86,41 +85,51 @@ start_link(Leader, Acceptors, Replicas, PVal) ->
 init([Leader, Acceptors, Replicas, PVal]) ->
     %% Instead of removing pids from a "waitfor" set, we'll just keep
     %% count.
-    Threshold = length(Acceptors) - (length(Acceptors) div 2),
     {ok, start_phase2,
      #state{
         leader = Leader,
         acceptors = Acceptors,
         replicas = Replicas,
         pvalue = PVal,
-        threshold = Threshold
+        waitfor = sets:from_list(Acceptors)
        },
      0}.
 
 start_phase2(timeout, #state{acceptors=Acceptors, pvalue=PVal}=State) ->
     [ paxos_acceptor:p2a(A, PVal) || A <- Acceptors ],
-    {next_state, collect, State}.
+    {next_state, waiting_p2b, State}.
 
 start_phase2(_Event, _From, State) ->
     {noreply, start_phase2, State}.
 
-collect({p2b, _A, B0}, #state{replies=R, pvalue={B0,_,_}}=State) ->
-    %% The ballot is the same, so we mark a reply
-    continue(State#state{replies=R+1});
-collect({p2b, _A, B0}, #state{leader=L}=State) ->
+waiting_p2b({p2b, A, B0}, #state{pvalue={B0,S,P}, waitfor=W, 
+                                 acceptors=Acceptors,
+                                 replicas=Replicas}=State) ->
+    case sets:is_member(A, W) of
+        false ->
+            {next_state, waiting_p2b, State};
+        true ->
+            NewState = State#state{waitfor=sets:del_element(A,W)},
+            case sets:size(NewState#state.waitfor) < length(Acceptors) / 2 of
+                false ->
+                    {next_state, waiting_p2b, NewState};
+                true ->
+                    [ paxos_replica:decision(R, S, P) || R <- Replicas ],
+                    {stop, normal, State}
+            end
+        end;
+waiting_p2b({p2b, A, B0}, #state{leader=L, waitfor=W}=State) ->
     %% The ballot is newer, so we abort and notify the leader
-    paxos_leader:preempted(L, B0),
-    {stop, normal, State}.
+    case sets:is_member(A,W) of
+        false ->
+            {next_state, waiting_p2b, State};
+        true ->
+            paxos_leader:preempted(L, B0),
+            {stop, normal, State}
+    end.
 
-collect(_Event, _From, State) ->
-    {noreply, collect, State}.
-
-continue(#state{threshold=T, replies=R}=State) when R < T ->
-    %% We haven't waited for enough yet, return to collect state.
-    {next_state, collect, State};
-continue(#state{replicas=Replicas, pvalue={_,S,P}}=State) ->
-    [ paxos_replica:decision(R, S, P) || R <- Replicas ],
-    {stop, normal, State}.
+waiting_p2b(_Event, _From, State) ->
+    {noreply, waiting_p2b, State}.
 
 
 %%--------------------------------------------------------------------

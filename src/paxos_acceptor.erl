@@ -28,14 +28,14 @@
 %% API
 -export([start_link/0,
          p1a/2,
-         p2a/2]).
+         p2a/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
 -record(state, { ballot_num :: term(),
-                 accepted :: ets:tid() }).
+                 accepted :: set() }).
 
 %%%===================================================================
 %%% API
@@ -75,7 +75,7 @@ p2a(Pid, Ballot, Slot, PVal) ->
 init([]) ->
     %% @todo Parameterize the memoization, perhaps with a callback module.
     %% Eventually we'd like this in something other than ETS.
-    {ok, #state{ accepted = ets:new(accepted, [ordered_set])}}.
+    {ok, #state{ accepted = sets:new() }}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -106,19 +106,19 @@ handle_call(_Msg, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({p1a, Leader, B}, #state{ballot_num = BallotNum,
-                                    accepted = Accepted}=State) ->
+                                     accepted = Accepted}=State) ->
     NewState = case B > BallotNum of
-                   true -> State#{ballot_num=B};
+                   true -> State#state{ballot_num=B};
                    false -> State
                end,
-    paxos_leader:p1b(Leader, B, ets:tab2list(Accepted)),
+    paxos_leader:p1b(Leader, B, Accepted),
     {noreply, NewState};
 handle_cast({p2a, Leader, {B,_,_}=Ballot}, #state{ballot_num=BallotNum,
                                                   accepted=Accepted}=State) ->
     NewState = case B >= BallotNum of
                    true ->
-                       ets:insert(Accepted, Ballot),
-                       State#state{ballot_num=B};
+                       State#state{ballot_num=B,
+                                   accepted=sets:add_element(Ballot, Accepted)};
                    false ->
                        State
                end,
@@ -168,4 +168,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
