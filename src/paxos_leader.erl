@@ -73,7 +73,7 @@ p2b(Pid, Ballot) ->
     gen_fsm:send_event(Pid, {p2b, self(), Ballot}).
 
 %%%===================================================================
-%%% gen_fsm callbacks
+%%% gen_server callbacks
 %%%===================================================================
 init([Acceptors, Replicas]) ->
     process_flag(trap_exit, true),
@@ -88,8 +88,7 @@ init([Acceptors, Replicas]) ->
        }}.
 
 handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+    {reply, unknown_call, State}.
 
 handle_cast({propose, S, P}, #state{acceptors=Acceptors,
                                     replicas=Replicas,
