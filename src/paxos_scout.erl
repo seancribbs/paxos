@@ -71,7 +71,7 @@ start_phase1(_Event, _From, State) ->
 
 waiting_p1b({p1b,A,B0,R}, #state{leader=L, ballot=B0, waitfor=W, pvalues=PVals,
                                  acceptors=Acceptors}=State) ->
-    case sets:is_member(A, W) of
+    case sets:is_element(A, W) of
         false ->
             {next_state, waiting_p1b, State};
         true ->
@@ -86,7 +86,7 @@ waiting_p1b({p1b,A,B0,R}, #state{leader=L, ballot=B0, waitfor=W, pvalues=PVals,
             end
     end;
 waiting_p1b({p1b,A,B0,_R}, #state{leader=L, ballot=B, waitfor=W}=State) when B0 =/= B ->
-    case sets:is_member(A,W) of
+    case sets:is_element(A,W) of
         false ->
             {next_state, waiting_p1b, State};
         true ->

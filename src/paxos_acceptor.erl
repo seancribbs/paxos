@@ -28,7 +28,7 @@
 %% API
 -export([start_link/0,
          p1a/2,
-         p2a/4]).
+         p2a/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -41,70 +41,27 @@
 %%% API
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 p1a(Pid, Ballot) ->
     gen_server:cast(Pid, {p1a, self(), Ballot}).
 
-p2a(Pid, Ballot, Slot, PVal) ->
-    gen_server:cast(Pid, {p2a, self(), {Ballot, Slot, PVal}}).
+p2a(Pid, PVal) ->
+    gen_server:cast(Pid, {p2a, self(), PVal}).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
 init([]) ->
     %% @todo Parameterize the memoization, perhaps with a callback module.
-    %% Eventually we'd like this in something other than ETS.
+    %% Eventually we'd like this in something other than sets.
     {ok, #state{ accepted = sets:new() }}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 handle_call(_Msg, _From, State) ->
     {stop, unknown_call, State}.
 
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 handle_cast({p1a, Leader, B}, #state{ballot_num = BallotNum,
                                      accepted = Accepted}=State) ->
     NewState = case B > BallotNum of
@@ -123,7 +80,7 @@ handle_cast({p2a, Leader, {B,_,_}=Ballot}, #state{ballot_num=BallotNum,
                        State
                end,
     paxos_leader:p2b(Leader, NewState#state.ballot_num),
-    {reply, {p2b, BallotNum}, NewState};
+    {noreply, NewState};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 

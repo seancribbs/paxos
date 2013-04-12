@@ -26,7 +26,12 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([start_link/2,
+         propose/3,
+         adopted/3,
+         preempted/2,
+         p1b/3,
+         p2b/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -49,6 +54,23 @@
 %%%===================================================================
 start_link(Acceptors, Replicas) ->
     gen_server:start_link(?MODULE, [Acceptors, Replicas], []).
+
+propose(Pid, Slot, PVal) ->
+    gen_server:cast(Pid, {propose, Slot, PVal}).
+
+adopted(Pid, Ballot, PVals) ->
+    gen_server:cast(Pid, {adopted, Ballot, PVals}).
+
+preempted(Pid, Ballot) ->
+    gen_server:cast(Pid, {preempted, Ballot}).
+
+p1b(Pid, Ballot, Accepted) ->
+    %% This is actually being sent to the scout, not the leader
+    gen_fsm:send_event(Pid, {p1b, self(), Ballot, Accepted}).
+
+p2b(Pid, Ballot) ->
+    %% This is actually being sent to the commander, not the leader
+    gen_fsm:send_event(Pid, {p2b, self(), Ballot}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -88,7 +110,7 @@ handle_cast({adopted, Ballot, PVals}, #state{acceptors=Acceptors,
                                              ballot_num=Ballot,
                                              proposals=Proposals}=State) ->
     NewProposals = update_proposals(Proposals, pmax(PVals)),
-    [ paxos_commander:spawn_link(self(), Acceptors, Replicas, {Ballot, S, P}) ||
+    [ paxos_commander:start_link(self(), Acceptors, Replicas, {Ballot, S, P}) ||
         {S, P} <- orddict:to_list(NewProposals) ],
     {noreply, State#state{proposals=NewProposals, active=true}};
 handle_cast({preempted, {R,_}=Ballot0}, #state{ballot_num=Ballot,
@@ -103,7 +125,7 @@ handle_cast(_, State) ->
 maybe_start_commander(false, _, _, _) ->
     ok;
 maybe_start_commander(true, Acceptors, Replicas, Job) ->
-    paxos_commander:spawn_link(self(), Acceptors, Replicas, Job).
+    paxos_commander:start_link(self(), Acceptors, Replicas, Job).
 
 pmax(Set) ->
     orddict:from_list([ {S,P} || {B,S,P} <- sets:to_list(Set),

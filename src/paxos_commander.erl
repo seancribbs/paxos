@@ -105,7 +105,7 @@ start_phase2(_Event, _From, State) ->
 waiting_p2b({p2b, A, B0}, #state{pvalue={B0,S,P}, waitfor=W, 
                                  acceptors=Acceptors,
                                  replicas=Replicas}=State) ->
-    case sets:is_member(A, W) of
+    case sets:is_element(A, W) of
         false ->
             {next_state, waiting_p2b, State};
         true ->
@@ -120,7 +120,7 @@ waiting_p2b({p2b, A, B0}, #state{pvalue={B0,S,P}, waitfor=W,
         end;
 waiting_p2b({p2b, A, B0}, #state{leader=L, waitfor=W}=State) ->
     %% The ballot is newer, so we abort and notify the leader
-    case sets:is_member(A,W) of
+    case sets:is_element(A,W) of
         false ->
             {next_state, waiting_p2b, State};
         true ->

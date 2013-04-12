@@ -137,7 +137,7 @@ propose(PVal, #state{slot_num=Slot,
             MaxSeq = lists:max([Slot, safe_last(Proposals), safe_last(Decisions)]),
             S = MaxSeq+1,
             ets:insert(Proposals, {S, PVal}),
-            riak_paxos_leader:propose(Leaders, {S, PVal}),
+            paxos_leader:propose(Leaders, S, PVal),
             State
     end.
 
