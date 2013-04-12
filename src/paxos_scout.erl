@@ -64,7 +64,7 @@ init([Leader, Acceptors, Ballot]) ->
 
 start_phase1(timeout, #state{acceptors=Acceptors, ballot=Ballot}=State) ->
     [ paxos_acceptor:p1a(A, Ballot) || A <- Acceptors ],
-    {next_state, collect, State}.
+    {next_state, waiting_p1b, State}.
 
 start_phase1(_Event, _From, State) ->
     {noreply, start_phase1, State}.
